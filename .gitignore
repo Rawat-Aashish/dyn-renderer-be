@@ -31,3 +31,13 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Project docs ###
+/docs/
+/handover/
+
+### Local config (secrets) ###
+application-local.properties
+
+### Project brief ###
+dynamic-form-builder.pdf
