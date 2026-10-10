@@ -34,11 +34,21 @@ public class GlobalExceptionHandler {
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
-	public ResponseEntity<ApiResponse<Map<String, String>>> handleValidation(MethodArgumentNotValidException ex) {
+	public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
 		Map<String, String> fieldErrors = new LinkedHashMap<>();
 		ex.getBindingResult().getFieldErrors()
 				.forEach(error -> fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage()));
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("Validation failed", fieldErrors));
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.validationError(fieldErrors));
+	}
+
+	@ExceptionHandler(ConflictException.class)
+	public ResponseEntity<ApiResponse<Void>> handleConflict(ConflictException ex) {
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(ex.getMessage()));
+	}
+
+	@ExceptionHandler(GoneException.class)
+	public ResponseEntity<ApiResponse<Void>> handleGone(GoneException ex) {
+		return ResponseEntity.status(HttpStatus.GONE).body(ApiResponse.error(ex.getMessage()));
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)
