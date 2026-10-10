@@ -45,6 +45,12 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.validationError(fieldErrors));
 	}
 
+	@ExceptionHandler(FieldErrorsException.class)
+	public ResponseEntity<ApiResponse<Void>> handleFieldErrors(FieldErrorsException ex) {
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(ApiResponse.fieldErrors(ex.getMessage(), ex.getErrors()));
+	}
+
 	@ExceptionHandler(ConflictException.class)
 	public ResponseEntity<ApiResponse<Void>> handleConflict(ConflictException ex) {
 		return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(ex.getMessage()));

@@ -48,6 +48,9 @@ public class SecurityConfig {
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/forms/*/published").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/forms/*/submissions/start").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/forms/*/submissions").permitAll()
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth -> oauth
 						.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))

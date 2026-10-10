@@ -3,15 +3,16 @@ package com.dynamicformbuilder.form;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dynamicformbuilder.audit.AuditAction;
+import com.dynamicformbuilder.audit.AuditService;
 import com.dynamicformbuilder.common.exception.BadRequestException;
 import com.dynamicformbuilder.common.exception.ConflictException;
 import com.dynamicformbuilder.common.exception.ResourceNotFoundException;
 import com.dynamicformbuilder.common.response.PageResponse;
+import com.dynamicformbuilder.common.response.Paging;
 import com.dynamicformbuilder.component.ComponentResponseAssembler;
 import com.dynamicformbuilder.condition.ConditionRepository;
 import com.dynamicformbuilder.condition.ConditionResponse;
@@ -22,20 +23,20 @@ import com.dynamicformbuilder.formversion.FormVersionStatus;
 @Service
 public class FormService {
 
-	private static final int DEFAULT_PAGE_SIZE = 20;
-	private static final int MAX_PAGE_SIZE = 100;
-
 	private final FormRepository formRepository;
 	private final FormVersionRepository formVersionRepository;
 	private final ComponentResponseAssembler componentAssembler;
 	private final ConditionRepository conditionRepository;
+	private final AuditService auditService;
 
 	public FormService(FormRepository formRepository, FormVersionRepository formVersionRepository,
-			ComponentResponseAssembler componentAssembler, ConditionRepository conditionRepository) {
+			ComponentResponseAssembler componentAssembler, ConditionRepository conditionRepository,
+			AuditService auditService) {
 		this.formRepository = formRepository;
 		this.formVersionRepository = formVersionRepository;
 		this.componentAssembler = componentAssembler;
 		this.conditionRepository = conditionRepository;
+		this.auditService = auditService;
 	}
 
 	@Transactional
@@ -62,25 +63,26 @@ public class FormService {
 		version.setStatus(FormVersionStatus.DRAFT);
 		formVersionRepository.save(version);
 
+		auditService.record(form.getId(), AuditAction.FORM_CREATED, 1);
 		return FormResponse.from(form);
 	}
 
 	@Transactional(readOnly = true)
 	public PageResponse<FormResponse> list(boolean archived, FormStatus status, String search, int page, int size) {
-		int safePage = Math.max(page, 0);
-		int safeSize = size < 1 ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
 		String pattern = "%" + (search == null ? "" : search.trim().toLowerCase()) + "%";
-
-		var pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+		var pageable = Paging.descending(page, size, "createdAt", "id");
 		return PageResponse.from(formRepository.search(archived, status, pattern, pageable), FormResponse::from);
 	}
 
 	@Transactional(readOnly = true)
 	public FormDetailResponse get(Long id) {
-		List<ConditionResponse> conditions = conditionRepository.findByFormIdOrderByIdAsc(id).stream()
+		return FormDetailResponse.from(findForm(id), componentAssembler.tree(id), conditions(id));
+	}
+
+	public List<ConditionResponse> conditions(Long formId) {
+		return conditionRepository.findByFormIdOrderByIdAsc(formId).stream()
 				.map(ConditionResponse::from)
 				.toList();
-		return FormDetailResponse.from(findForm(id), componentAssembler.tree(id), conditions);
 	}
 
 	@Transactional
@@ -96,7 +98,9 @@ public class FormService {
 		form.setName(request.name());
 		form.setDescription(request.description());
 		form.setCategory(request.category());
-		return FormResponse.from(formRepository.saveAndFlush(form));
+		formRepository.saveAndFlush(form);
+		auditService.record(id, AuditAction.FORM_UPDATED, form.getCurrentVersion());
+		return FormResponse.from(form);
 	}
 
 	@Transactional
@@ -114,7 +118,9 @@ public class FormService {
 		Form form = findForm(id);
 		requireNotArchived(form);
 		form.setDeletedAt(LocalDateTime.now());
-		return FormResponse.from(formRepository.saveAndFlush(form));
+		formRepository.saveAndFlush(form);
+		auditService.record(id, AuditAction.FORM_ARCHIVED, form.getCurrentVersion());
+		return FormResponse.from(form);
 	}
 
 	public Form findForm(Long id) {
@@ -130,7 +136,7 @@ public class FormService {
 		return form;
 	}
 
-	private void requireNotArchived(Form form) {
+	public void requireNotArchived(Form form) {
 		if (form.getDeletedAt() != null) {
 			throw new ConflictException("This form is archived and can no longer be changed");
 		}

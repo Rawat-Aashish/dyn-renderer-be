@@ -19,6 +19,10 @@ public record ApiResponse<T>(
 	}
 
 	public static <T> ApiResponse<T> validationError(Map<String, String> errors) {
-		return new ApiResponse<>(false, "Validation failed", null, errors);
+		return fieldErrors("Validation failed", errors);
+	}
+
+	public static <T> ApiResponse<T> fieldErrors(String message, Map<String, String> errors) {
+		return new ApiResponse<>(false, message, null, errors);
 	}
 }
