@@ -1,5 +1,6 @@
 package com.dynamicformbuilder.common.exception;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -14,9 +15,12 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.dynamicformbuilder.common.response.ApiResponse;
+
+import tools.jackson.databind.exc.InvalidFormatException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -53,7 +57,21 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	public ResponseEntity<ApiResponse<Void>> handleUnreadableBody(HttpMessageNotReadableException ex) {
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("Malformed or missing request body"));
+		String message = "Malformed or missing request body";
+		if (ex.getCause() instanceof InvalidFormatException invalid && !invalid.getPath().isEmpty()) {
+			String field = invalid.getPath().getLast().getPropertyName();
+			message = "Invalid value '" + invalid.getValue() + "' for '" + field + "'";
+			if (invalid.getTargetType() != null && invalid.getTargetType().isEnum()) {
+				message += ". Allowed values: " + Arrays.toString(invalid.getTargetType().getEnumConstants());
+			}
+		}
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(ApiResponse.error("Invalid value for '" + ex.getName() + "'"));
 	}
 
 	@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
