@@ -35,6 +35,13 @@ public class FormController {
 				.body(ApiResponse.success("Form created successfully", formService.create(request)));
 	}
 
+	@PostMapping("/{id}/clone")
+	public ResponseEntity<ApiResponse<FormResponse>> cloneForm(@PathVariable Long id,
+			@Valid @RequestBody CloneFormRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED)
+				.body(ApiResponse.success("Form cloned successfully", formService.cloneForm(id, request)));
+	}
+
 	@GetMapping
 	public ResponseEntity<ApiResponse<PageResponse<FormResponse>>> list(
 			@RequestParam(defaultValue = "false") boolean archived,

@@ -1,7 +1,10 @@
 package com.dynamicformbuilder.form;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,12 +16,18 @@ import com.dynamicformbuilder.common.exception.ConflictException;
 import com.dynamicformbuilder.common.exception.ResourceNotFoundException;
 import com.dynamicformbuilder.common.response.PageResponse;
 import com.dynamicformbuilder.common.response.Paging;
+import com.dynamicformbuilder.component.ComponentRepository;
 import com.dynamicformbuilder.component.ComponentResponseAssembler;
+import com.dynamicformbuilder.component.FormComponent;
 import com.dynamicformbuilder.condition.ConditionRepository;
 import com.dynamicformbuilder.condition.ConditionResponse;
+import com.dynamicformbuilder.condition.ConditionRule;
+import com.dynamicformbuilder.condition.FormCondition;
 import com.dynamicformbuilder.formversion.FormVersion;
 import com.dynamicformbuilder.formversion.FormVersionRepository;
 import com.dynamicformbuilder.formversion.FormVersionStatus;
+import com.dynamicformbuilder.validation.ValidationRule;
+import com.dynamicformbuilder.validation.ValidationRuleRepository;
 
 @Service
 public class FormService {
@@ -28,10 +37,15 @@ public class FormService {
 	private final ComponentResponseAssembler componentAssembler;
 	private final ConditionRepository conditionRepository;
 	private final AuditService auditService;
+	private final ComponentRepository componentRepository;
+	private final ValidationRuleRepository validationRuleRepository;
 
 	public FormService(FormRepository formRepository, FormVersionRepository formVersionRepository,
 			ComponentResponseAssembler componentAssembler, ConditionRepository conditionRepository,
-			AuditService auditService) {
+			AuditService auditService, ComponentRepository componentRepository,
+			ValidationRuleRepository validationRuleRepository) {
+		this.componentRepository = componentRepository;
+		this.validationRuleRepository = validationRuleRepository;
 		this.formRepository = formRepository;
 		this.formVersionRepository = formVersionRepository;
 		this.componentAssembler = componentAssembler;
@@ -41,18 +55,85 @@ public class FormService {
 
 	@Transactional
 	public FormResponse create(CreateFormRequest request) {
-		if (formRepository.existsByName(request.name())) {
+		return FormResponse.from(createDraft(request.name(), request.code(), request.description(),
+				request.category(), AuditAction.FORM_CREATED));
+	}
+
+	/**
+	 * Copies the source form's working copy (components, validation rules, conditions) into a new draft form.
+	 * Versions, submissions and audit rows are not copied, and the source may be in any state, even archived.
+	 */
+	@Transactional
+	public FormResponse cloneForm(Long sourceId, CloneFormRequest request) {
+		Form source = findForm(sourceId);
+		Form form = createDraft(request.name(), request.code(), source.getDescription(), source.getCategory(),
+				AuditAction.FORM_CLONED);
+
+		// Sections are saved before their children so a child can point at its new section's id
+		List<FormComponent> components = componentRepository.findByFormIdOrderByDisplayOrderAscIdAsc(sourceId).stream()
+				.sorted(Comparator.comparing(component -> component.getParentSectionId() != null))
+				.toList();
+		Map<Long, Long> newIds = new HashMap<>();
+		for (FormComponent component : components) {
+			FormComponent copy = new FormComponent();
+			copy.setFormId(form.getId());
+			copy.setFieldCode(component.getFieldCode());
+			copy.setFieldLabel(component.getFieldLabel());
+			copy.setComponentType(component.getComponentType());
+			copy.setPlaceholder(component.getPlaceholder());
+			copy.setHelpText(component.getHelpText());
+			copy.setDefaultValue(component.getDefaultValue());
+			copy.setDisplayOrder(component.getDisplayOrder());
+			copy.setRequired(component.isRequired());
+			copy.setReadOnly(component.isReadOnly());
+			copy.setDisabled(component.isDisabled());
+			copy.setVisible(component.isVisible());
+			copy.setParentSectionId(newIds.get(component.getParentSectionId()));
+			copy.setProperties(component.getProperties());
+			newIds.put(component.getId(), componentRepository.save(copy).getId());
+		}
+
+		for (ValidationRule rule : validationRuleRepository.findByComponentIdInOrderByIdAsc(newIds.keySet())) {
+			ValidationRule copy = new ValidationRule();
+			copy.setComponentId(newIds.get(rule.getComponentId()));
+			copy.setRuleType(rule.getRuleType());
+			copy.setRuleValue(rule.getRuleValue());
+			copy.setErrorMessage(rule.getErrorMessage());
+			validationRuleRepository.save(copy);
+		}
+
+		// Conditions name their fields by fieldCode, which the copy keeps, so nothing needs remapping
+		for (FormCondition condition : conditionRepository.findByFormIdOrderByIdAsc(sourceId)) {
+			FormCondition copy = new FormCondition();
+			copy.setFormId(form.getId());
+			copy.setTargetFieldCode(condition.getTargetFieldCode());
+			copy.setAction(condition.getAction());
+			copy.setLogicalOperator(condition.getLogicalOperator());
+			for (ConditionRule rule : condition.getRules()) {
+				ConditionRule ruleCopy = new ConditionRule();
+				ruleCopy.setSourceFieldCode(rule.getSourceFieldCode());
+				ruleCopy.setOperator(rule.getOperator());
+				ruleCopy.setValue(rule.getValue());
+				copy.getRules().add(ruleCopy);
+			}
+			conditionRepository.save(copy);
+		}
+		return FormResponse.from(form);
+	}
+
+	private Form createDraft(String name, String code, String description, String category, AuditAction action) {
+		if (formRepository.existsByName(name)) {
 			throw new ConflictException("A form with this name already exists");
 		}
-		if (formRepository.existsByCode(request.code())) {
+		if (formRepository.existsByCode(code)) {
 			throw new ConflictException("A form with this code already exists");
 		}
 
 		Form form = new Form();
-		form.setName(request.name());
-		form.setCode(request.code());
-		form.setDescription(request.description());
-		form.setCategory(request.category());
+		form.setName(name);
+		form.setCode(code);
+		form.setDescription(description);
+		form.setCategory(category);
 		form.setStatus(FormStatus.DRAFT);
 		form.setCurrentVersion(1);
 		formRepository.save(form);
@@ -63,8 +144,8 @@ public class FormService {
 		version.setStatus(FormVersionStatus.DRAFT);
 		formVersionRepository.save(version);
 
-		auditService.record(form.getId(), AuditAction.FORM_CREATED, 1);
-		return FormResponse.from(form);
+		auditService.record(form.getId(), action, 1);
+		return form;
 	}
 
 	@Transactional(readOnly = true)
