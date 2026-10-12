@@ -27,6 +27,8 @@ public class ComponentService {
 	private static final String STATIC_DATA_SOURCE = "STATIC";
 	private static final int DEFAULT_DECIMAL_PLACES = 2;
 	private static final int MAX_DECIMAL_PLACES = 10;
+	// Keep in step with spring.servlet.multipart.max-file-size in application.properties
+	private static final int MAX_FILE_SIZE_MB = 10;
 
 	private final ComponentRepository componentRepository;
 	private final ComponentResponseAssembler assembler;
@@ -157,7 +159,7 @@ public class ComponentService {
 		if (AnswerFormat.isEmpty(value)) {
 			return null;
 		}
-		if (type.isLayout()) {
+		if (type.isLayout() || type == ComponentType.FILE_UPLOAD) {
 			throw new BadRequestException(type + " components cannot have a default value");
 		}
 		String problem = AnswerFormat.check(type, properties, value);
@@ -168,13 +170,15 @@ public class ComponentService {
 	}
 
 	private ComponentProperties normaliseProperties(ComponentType type, ComponentProperties given) {
-		ComponentProperties p = given != null ? given : new ComponentProperties(null, null, null, null);
+		ComponentProperties p = given != null ? given : new ComponentProperties(null, null, null, null, null, null);
 
 		boolean choice = type.hasOptions();
 		rejectUnless(choice, p.dataSource(), "dataSource", type);
 		rejectUnless(choice, p.options(), "options", type);
 		rejectUnless(type == ComponentType.DECIMAL, p.decimalPlaces(), "decimalPlaces", type);
 		rejectUnless(type == ComponentType.SECTION, p.collapsible(), "collapsible", type);
+		rejectUnless(type == ComponentType.FILE_UPLOAD, p.allowedTypes(), "allowedTypes", type);
+		rejectUnless(type == ComponentType.FILE_UPLOAD, p.maxSizeMb(), "maxSizeMb", type);
 
 		if (choice) {
 			if (p.dataSource() != null && !STATIC_DATA_SOURCE.equals(p.dataSource())) {
@@ -186,19 +190,32 @@ public class ComponentService {
 					throw new BadRequestException("Every option needs a label and a value");
 				}
 			}
-			return new ComponentProperties(STATIC_DATA_SOURCE, options, null, null);
+			return new ComponentProperties(STATIC_DATA_SOURCE, options, null, null, null, null);
 		}
 		if (type == ComponentType.DECIMAL) {
 			int places = p.decimalPlaces() != null ? p.decimalPlaces() : DEFAULT_DECIMAL_PLACES;
 			if (places < 0 || places > MAX_DECIMAL_PLACES) {
 				throw new BadRequestException("decimalPlaces must be between 0 and " + MAX_DECIMAL_PLACES);
 			}
-			return new ComponentProperties(null, null, places, null);
+			return new ComponentProperties(null, null, places, null, null, null);
 		}
 		if (type == ComponentType.SECTION) {
-			return new ComponentProperties(null, null, null, Boolean.TRUE.equals(p.collapsible()));
+			return new ComponentProperties(null, null, null, Boolean.TRUE.equals(p.collapsible()), null, null);
 		}
-		return new ComponentProperties(null, null, null, null);
+		if (type == ComponentType.FILE_UPLOAD) {
+			// Left out or empty means every supported type: the admin can only narrow the server's list
+			List<String> types = p.allowedTypes() == null || p.allowedTypes().isEmpty() ? FileType.keys()
+					: p.allowedTypes().stream().distinct().toList();
+			if (!FileType.keys().containsAll(types)) {
+				throw new BadRequestException("allowedTypes may only contain: " + String.join(", ", FileType.keys()));
+			}
+			int maxSizeMb = p.maxSizeMb() != null ? p.maxSizeMb() : MAX_FILE_SIZE_MB;
+			if (maxSizeMb < 1 || maxSizeMb > MAX_FILE_SIZE_MB) {
+				throw new BadRequestException("maxSizeMb must be between 1 and " + MAX_FILE_SIZE_MB);
+			}
+			return new ComponentProperties(null, null, null, null, types, maxSizeMb);
+		}
+		return new ComponentProperties(null, null, null, null, null, null);
 	}
 
 	private void rejectUnless(boolean allowed, Object value, String name, ComponentType type) {

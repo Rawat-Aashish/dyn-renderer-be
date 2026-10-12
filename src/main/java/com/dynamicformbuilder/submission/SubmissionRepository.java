@@ -1,5 +1,8 @@
 package com.dynamicformbuilder.submission;
 
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,4 +26,9 @@ public interface SubmissionRepository extends JpaRepository<FormSubmission, Long
 	long countByFormId(Long formId);
 
 	long countByFormIdAndStatus(Long formId, SubmissionStatus status);
+
+	long countByFormIdAndRatingIsNotNull(Long formId);
+
+	@Query("select avg(s.rating) from FormSubmission s where s.formId = :formId")
+	Double averageRating(@Param("formId") Long formId);
 }

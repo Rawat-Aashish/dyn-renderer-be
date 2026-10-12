@@ -107,7 +107,8 @@ public class FormVersionService {
 		});
 
 		FormConfiguration configuration = new FormConfiguration(form.getName(), form.getCode(),
-				form.getDescription(), form.getCategory(), versionNumber, components, formService.conditions(formId));
+				form.getDescription(), form.getCategory(), versionNumber, form.isRatingEnabled(), components,
+				formService.conditions(formId));
 		version.setConfiguration(objectMapper.valueToTree(configuration));
 		version.setStatus(FormVersionStatus.PUBLISHED);
 		version.setPublishedAt(LocalDateTime.now());

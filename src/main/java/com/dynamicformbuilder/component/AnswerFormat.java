@@ -49,6 +49,7 @@ public final class AnswerFormat {
 			case DATE -> parses(value, DATE, false) ? null : "Must be a date in the format yyyy-MM-dd";
 			case DATETIME -> parses(value, DATE_TIME, true)
 					? null : "Must be a date and time in the format yyyy-MM-ddTHH:mm";
+			case FILE_UPLOAD -> value.isIntegralNumber() ? null : "Must be the id of an uploaded file";
 			case SECTION, HEADING -> "This component does not hold a value";
 		};
 	}

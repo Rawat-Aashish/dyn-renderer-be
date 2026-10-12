@@ -1,5 +1,11 @@
 package com.dynamicformbuilder.common.exception;
 
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -78,6 +84,31 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
 				.body(ApiResponse.error("Invalid value for '" + ex.getName() + "'"));
+	}
+
+	@ExceptionHandler({ MissingServletRequestParameterException.class, MissingServletRequestPartException.class })
+	public ResponseEntity<ApiResponse<Void>> handleMissingPart(Exception ex) {
+		String name = ex instanceof MissingServletRequestPartException part ? part.getRequestPartName()
+				: ((MissingServletRequestParameterException) ex).getParameterName();
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("'" + name + "' is required"));
+	}
+
+	// Spring refuses the request before any controller runs when it is over spring.servlet.multipart.max-file-size
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	public ResponseEntity<ApiResponse<Void>> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+		return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+				.body(ApiResponse.error("File is too large. Maximum size is 10 MB"));
+	}
+
+	@ExceptionHandler(MultipartException.class)
+	public ResponseEntity<ApiResponse<Void>> handleBrokenMultipart(MultipartException ex) {
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(ApiResponse.error("The request must be multipart/form-data with a file"));
+	}
+
+	@ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+	public ResponseEntity<ApiResponse<Void>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
+		return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(ApiResponse.error(ex.getMessage()));
 	}
 
 	@ExceptionHandler(HttpRequestMethodNotSupportedException.class)

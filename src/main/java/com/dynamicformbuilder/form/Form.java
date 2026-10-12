@@ -49,6 +49,10 @@ public class Form {
 
 	private Integer publishedVersion;
 
+	// Whether the form asks for a rating after it is submitted
+	@Column(nullable = false)
+	private boolean ratingEnabled;
+
 	private LocalDateTime deletedAt;
 
 	@CreationTimestamp

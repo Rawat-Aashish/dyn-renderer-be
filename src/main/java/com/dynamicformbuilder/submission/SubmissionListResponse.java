@@ -1,5 +1,7 @@
 package com.dynamicformbuilder.submission;
 
+import java.math.BigDecimal;
+
 import java.util.List;
 
 public record SubmissionListResponse(
@@ -9,6 +11,8 @@ public record SubmissionListResponse(
 		boolean archived,
 		long startedCount,
 		long submittedCount,
+		BigDecimal averageRating,
+		long ratingCount,
 		List<SubmissionResponse> items,
 		int page,
 		int size,

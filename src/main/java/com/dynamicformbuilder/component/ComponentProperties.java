@@ -9,7 +9,9 @@ public record ComponentProperties(
 		String dataSource,
 		List<Option> options,
 		Integer decimalPlaces,
-		Boolean collapsible) {
+		Boolean collapsible,
+		List<String> allowedTypes,
+		Integer maxSizeMb) {
 
 	public record Option(String label, String value) {
 	}

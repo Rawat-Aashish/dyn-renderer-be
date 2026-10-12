@@ -51,6 +51,8 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.GET, "/api/forms/*/published").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/forms/*/submissions/start").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/forms/*/submissions").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/forms/*/submissions/files").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/forms/*/submissions/rating").permitAll()
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth -> oauth
 						.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))

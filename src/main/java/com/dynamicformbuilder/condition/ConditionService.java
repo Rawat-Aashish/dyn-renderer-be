@@ -146,7 +146,7 @@ public class ConditionService {
 
 	private boolean operatorFits(ConditionOperator operator, ComponentType type) {
 		return switch (operator) {
-			case EQUALS, NOT_EQUALS -> !type.isMultiValue();
+			case EQUALS, NOT_EQUALS -> !type.isMultiValue() && type != ComponentType.FILE_UPLOAD;
 			case CONTAINS -> CONTAINS_TYPES.contains(type);
 			case GREATER_THAN, LESS_THAN, GREATER_THAN_OR_EQUAL, LESS_THAN_OR_EQUAL -> ORDERED_TYPES.contains(type);
 			case IS_EMPTY, IS_NOT_EMPTY -> true;

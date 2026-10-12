@@ -56,18 +56,18 @@ public class FormService {
 	@Transactional
 	public FormResponse create(CreateFormRequest request) {
 		return FormResponse.from(createDraft(request.name(), request.code(), request.description(),
-				request.category(), AuditAction.FORM_CREATED));
+				request.category(), Boolean.TRUE.equals(request.ratingEnabled()), AuditAction.FORM_CREATED));
 	}
 
 	/**
 	 * Copies the source form's working copy (components, validation rules, conditions) into a new draft form.
-	 * Versions, submissions and audit rows are not copied, and the source may be in any state, even archived.
+	 * The rating setting is copied too. Versions, submissions and audit rows are not copied, and the source may be in any state, even archived.
 	 */
 	@Transactional
 	public FormResponse cloneForm(Long sourceId, CloneFormRequest request) {
 		Form source = findForm(sourceId);
 		Form form = createDraft(request.name(), request.code(), source.getDescription(), source.getCategory(),
-				AuditAction.FORM_CLONED);
+				source.isRatingEnabled(), AuditAction.FORM_CLONED);
 
 		// Sections are saved before their children so a child can point at its new section's id
 		List<FormComponent> components = componentRepository.findByFormIdOrderByDisplayOrderAscIdAsc(sourceId).stream()
@@ -121,7 +121,8 @@ public class FormService {
 		return FormResponse.from(form);
 	}
 
-	private Form createDraft(String name, String code, String description, String category, AuditAction action) {
+	private Form createDraft(String name, String code, String description, String category, boolean ratingEnabled,
+			AuditAction action) {
 		if (formRepository.existsByName(name)) {
 			throw new ConflictException("A form with this name already exists");
 		}
@@ -134,6 +135,7 @@ public class FormService {
 		form.setCode(code);
 		form.setDescription(description);
 		form.setCategory(category);
+		form.setRatingEnabled(ratingEnabled);
 		form.setStatus(FormStatus.DRAFT);
 		form.setCurrentVersion(1);
 		formRepository.save(form);
@@ -179,6 +181,7 @@ public class FormService {
 		form.setName(request.name());
 		form.setDescription(request.description());
 		form.setCategory(request.category());
+		form.setRatingEnabled(Boolean.TRUE.equals(request.ratingEnabled()));
 		formRepository.saveAndFlush(form);
 		auditService.record(id, AuditAction.FORM_UPDATED, form.getCurrentVersion());
 		return FormResponse.from(form);

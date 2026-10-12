@@ -13,7 +13,7 @@ import jakarta.validation.constraints.Size;
 
 @Validated
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(@Valid Jwt jwt, @NotNull Cors cors, @NotNull Seed seed) {
+public record AppProperties(@Valid Jwt jwt, @NotNull Cors cors, @NotNull Seed seed, @NotNull @Valid Upload upload) {
 
 	public record Jwt(
 			@NotBlank @Size(min = 32, message = "must be at least 32 characters for HS256") String secret,
@@ -25,5 +25,9 @@ public record AppProperties(@Valid Jwt jwt, @NotNull Cors cors, @NotNull Seed se
 	}
 
 	public record Seed(boolean enabled) {
+	}
+
+	// app.upload.dir=uploads (relative to where the app is started, or an absolute path)
+	public record Upload(@NotBlank String dir) {
 	}
 }

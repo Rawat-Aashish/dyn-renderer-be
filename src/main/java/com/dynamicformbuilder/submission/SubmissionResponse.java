@@ -1,5 +1,7 @@
 package com.dynamicformbuilder.submission;
 
+import java.math.BigDecimal;
+
 import java.time.LocalDateTime;
 
 import com.dynamicformbuilder.form.Form;
@@ -15,11 +17,12 @@ public record SubmissionResponse(
 		Integer version,
 		LocalDateTime startedAt,
 		LocalDateTime submittedAt,
+		BigDecimal rating,
 		JsonNode data) {
 
 	public static SubmissionResponse from(FormSubmission submission, Form form, Integer versionNumber) {
 		return new SubmissionResponse(submission.getId(), form.getId(), form.getCode(), form.getName(),
 				form.getDeletedAt() != null, versionNumber, submission.getStartedAt(), submission.getSubmittedAt(),
-				submission.getSubmittedData());
+				submission.getRating(), submission.getSubmittedData());
 	}
 }

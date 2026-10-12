@@ -35,6 +35,7 @@ import tools.jackson.databind.node.ObjectNode;
 public class AnswerEvaluator {
 
 	private final JsonNode answers;
+	private final Map<String, JsonNode> files;
 	private final Map<String, ComponentResponse> fields = new LinkedHashMap<>();
 	private final Map<String, String> sectionOf = new HashMap<>();
 	private final Map<String, Map<Property, ConditionResponse>> conditions = new HashMap<>();
@@ -43,8 +44,10 @@ public class AnswerEvaluator {
 	private final Map<String, String> errors = new LinkedHashMap<>();
 	private final ObjectNode cleaned = JsonNodeFactory.instance.objectNode();
 
-	public AnswerEvaluator(FormConfiguration configuration, JsonNode answers) {
+	/** @param files what was uploaded for this submission, keyed by field code, in the shape stored as the answer */
+	public AnswerEvaluator(FormConfiguration configuration, JsonNode answers, Map<String, JsonNode> files) {
 		this.answers = answers;
+		this.files = files;
 		for (ComponentResponse top : configuration.components()) {
 			fields.put(top.fieldCode(), top);
 			for (ComponentResponse child : top.children()) {
@@ -82,6 +85,15 @@ public class AnswerEvaluator {
 			String problem = AnswerRules.check(field, value);
 			if (problem == null && required && field.componentType() == ComponentType.TOGGLE && !value.asBoolean()) {
 				problem = "This field is required";
+			}
+			if (problem == null && field.componentType() == ComponentType.FILE_UPLOAD) {
+				// The answer is a file id; it only counts if that file was uploaded for this field of this submission
+				JsonNode file = files.get(code);
+				if (file == null || file.get("fileId").asLong() != value.asLong()) {
+					problem = "File not found. Upload the file again";
+				} else {
+					value = file;
+				}
 			}
 			if (problem != null) {
 				errors.put(code, problem);

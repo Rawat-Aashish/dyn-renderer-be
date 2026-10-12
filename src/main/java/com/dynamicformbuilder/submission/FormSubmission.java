@@ -1,5 +1,7 @@
 package com.dynamicformbuilder.submission;
 
+import java.math.BigDecimal;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -50,4 +52,7 @@ public class FormSubmission {
 	private LocalDateTime startedAt;
 
 	private LocalDateTime submittedAt;
+
+	@Column(precision = 2, scale = 1)
+	private BigDecimal rating;
 }

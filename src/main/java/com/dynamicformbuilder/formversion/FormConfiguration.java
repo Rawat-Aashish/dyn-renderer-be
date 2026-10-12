@@ -15,6 +15,8 @@ public record FormConfiguration(
 		String description,
 		String category,
 		Integer version,
+		// Missing in snapshots published before ratings existed; read that as false
+		Boolean ratingEnabled,
 		List<ComponentResponse> components,
 		List<ConditionResponse> conditions) {
 }

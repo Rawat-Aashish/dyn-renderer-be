@@ -13,5 +13,7 @@ public record UpdateFormRequest(
 		String description,
 
 		@Size(max = 100, message = "Category must be at most 100 characters")
-		String category) {
+		String category,
+
+		Boolean ratingEnabled) {
 }
